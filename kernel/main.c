@@ -11,6 +11,7 @@ void
 main()
 {
   if(cpuid() == 0){
+    printf("\naaaaaaa\n");
     consoleinit();
     printfinit();
     printf("\n");
@@ -32,6 +33,7 @@ main()
     __sync_synchronize();
     started = 1;
   } else {
+    printf("\nbbbbbbbb\n");
     while(started == 0)
       ;
     __sync_synchronize();

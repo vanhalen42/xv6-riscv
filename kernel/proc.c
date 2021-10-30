@@ -444,7 +444,7 @@ scheduler(void)
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
-
+#ifdef ROUND_ROBIN
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->state == RUNNABLE) {
@@ -461,6 +461,8 @@ scheduler(void)
       }
       release(&p->lock);
     }
+#endif
+
   }
 }
 

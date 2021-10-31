@@ -130,11 +130,14 @@ UPROGS=\
 	$U/_rm\
 	$U/_sh\
 	$U/_stressfs\
+	$U/_time\
 	$U/_usertests\
 	$U/_grind\
 	$U/_wc\
 	$U/_zombie\
 	$U/_strace\
+	$U/_schedulertest\
+	# $U/_setpriority\
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)

@@ -115,4 +115,6 @@ struct proc {
   int run_time;
   int sleep_time;
   int nrun;                    // number of time process was picked
+  uint etime;                   // When did the process exited
+
 };

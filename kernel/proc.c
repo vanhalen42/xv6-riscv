@@ -117,7 +117,10 @@ allocproc(void)
   return 0;
 
 found:
-  p->init_time = ticks;
+  p->sleep_time = 0;
+  p->static_priority = 60;
+  p->dynamic_priority = 60;
+  p->niceness = 5;
   p->pid = allocpid();
   p->state = USED;
 
@@ -141,7 +144,9 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
-
+  p->run_time=0;
+  p->init_time = ticks;
+  p->etime = 0;
   return p;
 }
 
@@ -371,6 +376,7 @@ exit(int status)
 
   p->xstate = status;
   p->state = ZOMBIE;
+  p->etime = ticks;
 
   release(&wait_lock);
 
@@ -427,6 +433,81 @@ wait(uint64 addr)
     sleep(p, &wait_lock);  //DOC: wait-sleep
   }
 }
+// Wait for a child process to exit and return its pid.
+// Return -1 if this process has no children.
+int
+waitx(uint64 addr, uint* run_time, uint* wtime)
+{
+  struct proc *np;
+  int havekids, pid;
+  struct proc *p = myproc();
+
+  acquire(&wait_lock);
+
+  for(;;){
+    // Scan through table looking for exited children.
+    havekids = 0;
+    for(np = proc; np < &proc[NPROC]; np++){
+      if(np->parent == p){
+        // make sure the child isn't still in exit() or swtch().
+        acquire(&np->lock);
+
+        havekids = 1;
+        if(np->state == ZOMBIE){
+          // Found one.
+          pid = np->pid;
+          *run_time = np->run_time;
+          *wtime = np->etime - np->init_time - np->run_time;
+          if(addr != 0 && copyout(p->pagetable, addr, (char *)&np->xstate,
+                                  sizeof(np->xstate)) < 0) {
+            release(&np->lock);
+            release(&wait_lock);
+            return -1;
+          }
+          freeproc(np);
+          release(&np->lock);
+          release(&wait_lock);
+          return pid;
+        }
+        release(&np->lock);
+      }
+    }
+
+    // No point waiting if we don't have any children.
+    if(!havekids || p->killed){
+      release(&wait_lock);
+      return -1;
+    }
+
+    // Wait for a child to exit.
+    sleep(p, &wait_lock);  //DOC: wait-sleep
+  }
+}
+
+void
+update_time()
+{
+  struct proc* p;
+  for (p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if (p->state == RUNNING) {
+      p->run_time++;
+    }
+    release(&p->lock); 
+  }
+}
+int
+set_priority(int new_prio, int pid) 
+{
+  for(struct proc *p = proc; p < &proc[NPROC]; p++){
+    if(p->pid == pid){
+      int old_priority = p->static_priority;
+      p->static_priority = new_prio;
+      return old_priority;
+    }
+  }
+   return -1;
+}
 
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -454,7 +535,6 @@ scheduler(void)
     struct proc * next_process=0;
     for (p = proc; p < &proc[NPROC]; p++)
     {
-      // acquire(&p->lock);
       if(p->state == RUNNABLE)
       {
         if(next_process == 0 || p->init_time < next_process->init_time)
@@ -462,14 +542,35 @@ scheduler(void)
           next_process=p;
         }
       }
-      // release(&p->lock);
     }
     if(next_process != 0)
       schedule(next_process,c);
 #endif
 
 #ifdef PBS
-
+    struct proc * next_process=0;
+    for (p = proc; p < &proc[NPROC]; p++)
+    {
+      if(p->state == RUNNABLE)
+      {
+        if(next_process == 0 || p->dynamic_priority < next_process->dynamic_priority)
+        {
+          next_process=p;
+        }
+        else if(p->dynamic_priority == next_process->dynamic_priority)
+        {
+          if(p->nrun < next_process->nrun)
+            next_process = p;
+          else if (p->nrun == next_process->nrun)
+          {
+            if(p->init_time <= next_process->init_time)
+              next_process=p;
+          }
+        }
+      }
+    }
+    if(next_process != 0)
+      schedule(next_process,c);
 #endif
   }
 }
@@ -663,23 +764,56 @@ procdump(void)
 {
   static char *states[] = {
   [UNUSED]    "unused",
-  [SLEEPING]  "sleep ",
-  [RUNNABLE]  "runble",
-  [RUNNING]   "run   ",
-  [ZOMBIE]    "zombie"
+  [SLEEPING]  "sleeping ",
+  [RUNNABLE]  "runnable",
+  [RUNNING]   "running   ",
+  [ZOMBIE]    "zombie",
+  [USED] "used",
   };
   struct proc *p;
   char *state;
-
   printf("\n");
-  for(p = proc; p < &proc[NPROC]; p++){
-    if(p->state == UNUSED)
-      continue;
-    if(p->state >= 0 && p->state < NELEM(states) && states[p->state])
-      state = states[p->state];
-    else
-      state = "???";
-    printf("%d %s %s", p->pid, state, p->name);
-    printf("\n");
+#ifdef PBS
+  printf("Name \t\t\t Pid \t Priority \t State \t\t Run_time \t Sleep_time \t Num_runs \n");
+#endif
+#ifdef ROUND_ROBIN
+  printf("Name \t\t\t Pid \t\t State \t\t Run_time \t Sleep_time \t Num_runs \n");
+#endif
+#ifdef FCFS
+  printf("Name \t\t\t Pid \t\t State \t\t Run_time \t Sleep_time \t Num_runs \n");
+#endif
+  for (p = proc; p < &proc[NPROC]; p++)
+  {
+      if (p->state == UNUSED)
+          continue;
+      if (p->state >= 0 && p->state < NELEM(states) && states[p->state])
+          state = states[p->state];
+      else
+          state = "???";
+#ifdef PBS
+      if(strlen(p->name)>7)
+          printf("%s \t\t %d \t %d \t\t %s \t %d \t\t %d \t\t %d", p->name, p->pid, p->dynamic_priority, state, p->run_time, p->sleep_time, p-> nrun);
+      else
+      {
+        printf("%s \t\t\t %d \t %d \t\t %s \t %d \t\t %d \t\t %d", p->name, p->pid, p->dynamic_priority, state, p->run_time, p->sleep_time, p-> nrun);
+      }
+#endif
+#ifdef FCFS
+      if(strlen(p->name)>7)
+          printf("%s \t\t %d \t\t %s \t %d \t\t %d \t\t %d", p->name, p->pid, state, p->run_time, p->sleep_time, p-> nrun);
+      else
+      {
+        printf("%s \t\t\t %d \t\t %s \t %d \t\t %d \t\t %d", p->name, p->pid, state, p->run_time, p->sleep_time, p-> nrun);
+      }
+#endif
+#ifdef ROUND_ROBIN
+      if(strlen(p->name)>7)
+          printf("%s \t\t %d \t\t %s \t %d \t\t %d \t\t %d", p->name, p->pid, state, p->run_time, p->sleep_time, p-> nrun);
+      else
+      {
+        printf("%s \t\t\t %d \t\t %s \t %d \t\t %d \t\t %d", p->name, p->pid, state, p->run_time, p->sleep_time, p-> nrun);
+      }
+#endif
+      printf("\n");
   }
 }

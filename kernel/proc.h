@@ -106,4 +106,13 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
+
+  //PBS scheduler related
+  int static_priority;         // in the rance of 0,100, default 60
+  int dynamic_priority;        // caulculated from static priority and niceness
+  int niceness;                // 0 to 10
+  int run_time;
+  int sleep_time;
+  int nrun;                    // number of time process was picked
 };

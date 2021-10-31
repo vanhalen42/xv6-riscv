@@ -117,6 +117,7 @@ allocproc(void)
   return 0;
 
 found:
+  p->init_time = ticks;
   p->pid = allocpid();
   p->state = USED;
 
@@ -437,35 +438,61 @@ wait(uint64 addr)
 void
 scheduler(void)
 {
-  struct proc *p;
+  struct proc *p; 
   struct cpu *c = mycpu();
-  
-  c->proc = 0;
+  c->proc=0;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 #ifdef ROUND_ROBIN
     for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
-
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
-      }
-      release(&p->lock);
+      schedule(p,c);
     }
 #endif
 
+#ifdef FCFS
+    struct proc * next_process=0;
+    for (p = proc; p < &proc[NPROC]; p++)
+    {
+      // acquire(&p->lock);
+      if(p->state == RUNNABLE)
+      {
+        if(next_process == 0 || p->init_time < next_process->init_time)
+        {
+          next_process=p;
+        }
+      }
+      // release(&p->lock);
+    }
+    if(next_process != 0)
+      schedule(next_process,c);
+#endif
+
+#ifdef PBS
+
+#endif
   }
 }
 
+// schedules a process passed as argument
+void 
+schedule(struct proc * p, struct cpu* c)
+{
+  acquire(&p->lock);
+  if(p->state == RUNNABLE) {
+    // Switch to chosen process.  It is the process's job
+    // to release its lock and then reacquire it
+    // before jumping back to us.
+    p->state = RUNNING;
+    c->proc = p;
+    swtch(&c->context, &p->context);
+
+    // Process is done running for now.
+    // It should have changed its p->state before coming back.
+    c->proc = 0;
+  }
+  release(&p->lock);
+}
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores
 // intena because intena is a property of this

@@ -10,6 +10,7 @@ struct spinlock tickslock;
 uint ticks;
 
 extern char trampoline[], uservec[], userret[];
+extern struct proc proc[NPROC];
 
 // in kernelvec.S, calls kerneltrap().
 void kernelvec();
@@ -168,6 +169,15 @@ clockintr()
   ticks++;
   wakeup(&ticks);
   release(&tickslock);
+  struct proc *p;
+  for(p=proc;p<&proc[NPROC];p++)
+  {
+    acquire(&p->lock);
+    if(p->state == RUNNING)
+    {
+    }
+    release(&p->lock);
+  }
 }
 
 // check if it's an external interrupt or software interrupt,

@@ -95,6 +95,7 @@ struct cpu*     getmycpu(void);
 struct proc*    myproc();
 void            procinit(void);
 void            scheduler(void) __attribute__((noreturn));
+void            schedule(struct proc * p, struct cpu* c);
 void            sched(void);
 void            sleep(void*, struct spinlock*);
 void            userinit(void);

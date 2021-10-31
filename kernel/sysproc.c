@@ -126,7 +126,7 @@ sys_waitx(void)
   return ret;
 }
 uint64
-sys_set_priority(void)
+sys_setpriority(void)
 {
 #ifndef PBS
   return -1; // returns -1 if any other scheduler is used
@@ -145,5 +145,5 @@ sys_set_priority(void)
   {
     return -1;
   }
-  return set_priority(new_priority, pid);
+  return setpriority(new_priority, pid);
 }

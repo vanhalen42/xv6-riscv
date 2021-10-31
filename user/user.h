@@ -24,7 +24,6 @@ int getpid(void);
 char *sbrk(int);
 int sleep(int);
 int uptime(void);
-int setpriority(void);
 
 // ulib.c
 int stat(const char *, struct stat *);
@@ -43,4 +42,4 @@ int atoi(const char *);
 int memcmp(const void *, const void *, uint);
 void *memcpy(void *, const void *, uint);
 int trace(int);
-int set_priority(int, int);
+int setpriority(int, int);

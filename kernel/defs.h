@@ -94,7 +94,7 @@ struct cpu*     mycpu(void);
 struct cpu*     getmycpu(void);
 struct proc*    myproc();
 void            procinit(void);
-int             set_priority(int, int);
+int             setpriority(int, int);
 void            scheduler(void) __attribute__((noreturn));
 void            schedule(struct proc * p, struct cpu* c);
 void            sched(void);

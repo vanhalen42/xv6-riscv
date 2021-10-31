@@ -497,12 +497,14 @@ update_time()
   }
 }
 int
-set_priority(int new_prio, int pid) 
+setpriority(int new_priority, int pid) 
 {
-  for(struct proc *p = proc; p < &proc[NPROC]; p++){
-    if(p->pid == pid){
+  for(struct proc *p = proc; p < &proc[NPROC]; p++)
+  {
+    if(p->pid == pid)
+    {
       int old_priority = p->static_priority;
-      p->static_priority = new_prio;
+      p->static_priority = new_priority;
       return old_priority;
     }
   }

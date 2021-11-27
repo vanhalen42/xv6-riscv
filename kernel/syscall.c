@@ -155,6 +155,7 @@ char *system_call_name[] = {
     "mkdir",
     "close",
     "strace",
+    "setpriority"
 };
 
 static int syscall_args[] = {

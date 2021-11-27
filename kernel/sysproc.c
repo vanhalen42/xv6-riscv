@@ -98,7 +98,8 @@ sys_uptime(void)
   return xticks;
 }
 
-uint64 sys_trace(void)
+uint64 
+sys_trace(void)
 {
   int mask = 0;
   if (argint(0, &mask) < 0)
